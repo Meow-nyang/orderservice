@@ -1,8 +1,10 @@
 package com.playdata.orderservice.user.service;
 
+import com.playdata.orderservice.user.dto.UserLoginReqDto;
 import com.playdata.orderservice.user.dto.UserSaveReqDto;
 import com.playdata.orderservice.user.entity.User;
 import com.playdata.orderservice.user.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +35,20 @@ public class UserService {
         User user = dto.toEntity();
         User saved = userRepository.save(user);
         return saved;
+    }
+
+    public User login(UserLoginReqDto dto) {
+        // 이메일로 user 조회하기
+        User user = userRepository.findByEmail(dto.getEmail()).orElseThrow(
+                () -> new EntityNotFoundException("User not found!")
+        );
+
+        // 비밀번호 확인하기
+        if (!user.getPassword().equals(dto.getPassword())) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+
+        return user;
     }
 
 }
