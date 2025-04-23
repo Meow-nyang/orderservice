@@ -1,11 +1,14 @@
 package com.playdata.orderservice.user.service;
 
+import com.playdata.orderservice.common.auth.TokenUserInfo;
+import com.playdata.orderservice.common.dto.UserResDto;
 import com.playdata.orderservice.user.dto.UserLoginReqDto;
 import com.playdata.orderservice.user.dto.UserSaveReqDto;
 import com.playdata.orderservice.user.entity.User;
 import com.playdata.orderservice.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -51,4 +54,24 @@ public class UserService {
         return user;
     }
 
+    public UserResDto myInfo() {
+        TokenUserInfo userInfo
+                // 필터에서 세팅한 시큐리티 인증 정보를 불러오는 메서드
+                = (TokenUserInfo) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+
+        User user = userRepository.findByEmail(userInfo.getEmail())
+                .orElseThrow(
+                        () -> new EntityNotFoundException("User not found!")
+                );
+
+        return user.fromEntity();
+    }
 }
+
+
+
+
+
+
+
