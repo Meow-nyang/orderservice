@@ -1,5 +1,6 @@
 package com.playdata.orderservice.common.auth;
 
+import com.playdata.orderservice.user.entity.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -47,4 +48,35 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    /**
+     * 클라이언트가 전송한 토큰을 디코딩하여 토큰의 위조 여부를 확인
+     * 토큰을 json으로 파싱해서 클레임(토큰 정보)을 리턴
+     *
+     * @param token - 필터가 전달해 준 토큰
+     * @return - 토큰 안에 있는 인증된 유저 정보를 반환
+     */
+    public TokenUserInfo validateAndGetTokenUserInfo(String token)
+            throws Exception {
+        Claims claims = Jwts.parserBuilder()
+                // 토큰 발급자의 발급 당시의 서명을 넣어줌.
+                .setSigningKey(secretKey)
+                // 토큰 유효성 검사를 해주는 parser 객체 생성.
+                // 생성 과정에서 서명이 위조된 경우에는 예외가 발생합니다.
+                // 위조되지 않았다면 payload를 리턴해 줍니다.
+                .build()
+                // 리턴된 payload에서 Claim을 파싱하자.
+                .parseClaimsJws(token)
+                // Claim을 리턴
+                .getBody();
+
+        System.out.println("claims = " + claims);
+
+        return TokenUserInfo.builder()
+                .email(claims.getSubject())
+                // 클레임이 Role타입으로 바로 변환을 못 해줍니다.
+                // 일단 String으로 데이터를 꺼내고 직접 Role타입으로 포장해서 넣어 줍니다.
+                .role(Role.valueOf(claims.get("role", String.class)))
+                .build();
+
+    }
 }
