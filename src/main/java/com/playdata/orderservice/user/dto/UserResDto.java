@@ -1,4 +1,4 @@
-package com.playdata.orderservice.common.dto;
+package com.playdata.orderservice.user.dto;
 
 import com.playdata.orderservice.common.entity.Address;
 import com.playdata.orderservice.user.entity.Role;

@@ -1,6 +1,6 @@
 package com.playdata.orderservice.user.entity;
 
-import com.playdata.orderservice.common.dto.UserResDto;
+import com.playdata.orderservice.user.dto.UserResDto;
 import com.playdata.orderservice.common.entity.Address;
 import jakarta.persistence.*;
 import lombok.*;

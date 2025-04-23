@@ -9,6 +9,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -37,6 +39,7 @@ public class SecurityConfig {
         // 요청 권한 설정 (어떤 url이냐에 따라 검사를 할 지 말지를 결정)
         http.authorizeHttpRequests(auth -> {
             auth
+//                    .requestMatchers("/user/list").hasRole("ROLE_ADMIN")
                     .requestMatchers("/user/create", "/user/doLogin").permitAll()
                     .anyRequest().authenticated();
         });
@@ -55,6 +58,11 @@ public class SecurityConfig {
 
         // 설정한 HttpSecurity 객체를 기반으로 시큐리티 설정 구축 및 반환.
         return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
 }
