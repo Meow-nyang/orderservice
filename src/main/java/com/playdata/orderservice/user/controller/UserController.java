@@ -1,6 +1,7 @@
 package com.playdata.orderservice.user.controller;
 
 import com.playdata.orderservice.common.auth.JwtTokenProvider;
+import com.playdata.orderservice.common.dto.CommonErrorDto;
 import com.playdata.orderservice.common.dto.CommonResDto;
 import com.playdata.orderservice.user.dto.UserLoginReqDto;
 import com.playdata.orderservice.user.dto.UserResDto;
@@ -9,23 +10,30 @@ import com.playdata.orderservice.user.entity.User;
 import com.playdata.orderservice.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user") // user 관련 요청은 /user로 시작한다고 가정.
 @RequiredArgsConstructor
+@Slf4j
 public class UserController {
 
     // 컨트롤러는 서비스에 의존하고 있다. (요청과 함께 전달받은 데이터를 서비스에게 넘겨야 함!)
     // 빈 등록된 서비스 객체를 자동으로 주입 받자!
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     /*
      프론트 단에서 회원 가입 요청 보낼때 함께 보내는 데이터 (JSON) -> dto로 받자.
@@ -66,11 +74,29 @@ public class UserController {
         // 로그인 유지를 해 주고 싶다.
         // 백엔드는 요청이 들어왔을 때 이 사람이 이전에 로그인 성공 한 사람인지 알 수가 없다.
         // 징표를 하나 만들어 주겠다. -> JWT를 발급해서 클라이언트에게 전달해 주겠다!
+        // Access Token 발급 -> 수명이 짧습니다. (토큰 탈취 방지)
         String token
                 = jwtTokenProvider.createToken(user.getEmail(), user.getRole().toString());
+
+        // Refresh Token을 생성해 주겠다.
+        // Access Token 수명이 만료되었을 경우 Refresh Token을 확인해서 리프레시가 유효한 경우
+        // 로그인 없이 Access Token을 재발급 해주는 용도로 사용.
+        String refreshToken
+                = jwtTokenProvider.createRefreshToken(user.getEmail(), user.getRole().toString());
+
+        // refreshToken을 DB에 저장하자. (redis)
+//        userService.saveRefreshToken(user.getEmail(), refreshToken);
+        redisTemplate.opsForValue().set("user:refresh:" + user.getId(), refreshToken, 2, TimeUnit.MINUTES);
+
+        // Map을 이용해서 사용자의 id와 token을 포장하자.
+        Map<String, Object> loginInfo = new HashMap<>();
+        loginInfo.put("token", token);
+        loginInfo.put("id", user.getId());
+        loginInfo.put("role", user.getRole().toString());
+
         CommonResDto resDto
                 = new CommonResDto(HttpStatus.OK,
-                "Login Success", token);
+                "Login Success", loginInfo);
         return new ResponseEntity<>(resDto, HttpStatus.OK);
     }
 
@@ -97,6 +123,31 @@ public class UserController {
                 = new CommonResDto(HttpStatus.OK, "myInfo 조회 성공", dto);
 
         return new ResponseEntity<>(resDto, HttpStatus.OK);
+    }
+
+    // access token이 만료되어 새 토큰을 요청
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> map) {
+        String id = map.get("id");
+        log.info("/user/refresh: POST, id: {}", id);
+        // redis에 해당 id로 조회되는 내용이 있는지 확인
+        Object obj = redisTemplate.opsForValue().get("user:refresh:" + id);
+        log.info("obj: {}", obj);
+        if (obj == null) { // refresh token이 수명이 다됨.
+            return new ResponseEntity<>(new CommonErrorDto(
+                    HttpStatus.UNAUTHORIZED, "EXPIRED_RT"),
+                    HttpStatus.UNAUTHORIZED);
+        }
+        // 새로운 access token을 발급
+        User user = userService.findById(id);
+        String newAccessToken
+                = jwtTokenProvider.createToken(user.getEmail(), user.getRole().toString());
+
+        Map<String, Object> info = new HashMap<>();
+        info.put("token", newAccessToken);
+        CommonResDto resDto
+                = new CommonResDto(HttpStatus.OK, "새 토큰 발급됨", info);
+        return ResponseEntity.ok().body(resDto);
     }
 
 
